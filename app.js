@@ -5,6 +5,7 @@ async function loadEthers() {
 
   const sources = [
     "./vendor/ethers.min.js",
+    "./ethers.min.js",
     "https://cdn.jsdelivr.net/npm/ethers@6.13.5/+esm",
     "https://esm.sh/ethers@6.13.5"
   ];

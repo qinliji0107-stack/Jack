@@ -315,6 +315,20 @@ h2 {
   font-weight: 700;
 }
 
+.import-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.import-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 input,
 textarea {
   width: 100%;

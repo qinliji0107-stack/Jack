@@ -91,6 +91,12 @@
 
           <label class="field">
             <span>收款地址和金额</span>
+            <div class="import-row">
+              <button id="importBtn" class="ghost-btn small" type="button">导入 Excel/CSV</button>
+              <button id="sampleCsvBtn" class="ghost-btn small" type="button">下载模板</button>
+              <span>模板填好后另存为 CSV 导入，或直接从 Excel 复制两列粘贴</span>
+            </div>
+            <input id="fileInput" type="file" accept=".csv,.txt,.xlsx,.xls" hidden />
             <textarea id="recipientInput" spellcheck="false" placeholder="每行一条：地址,金额&#10;0x1111111111111111111111111111111111111111,1.5&#10;0x2222222222222222222222222222222222222222,2"></textarea>
           </label>
 

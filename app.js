@@ -87,6 +87,9 @@ const els = {
   tokenDecimals: document.querySelector("#tokenDecimals"),
   tokenBalance: document.querySelector("#tokenBalance"),
   recipientInput: document.querySelector("#recipientInput"),
+  importBtn: document.querySelector("#importBtn"),
+  sampleCsvBtn: document.querySelector("#sampleCsvBtn"),
+  fileInput: document.querySelector("#fileInput"),
   validCount: document.querySelector("#validCount"),
   totalAmount: document.querySelector("#totalAmount"),
   txCount: document.querySelector("#txCount"),
@@ -302,6 +305,75 @@ function getValidRowsAndTotal() {
   const validRows = validateRows();
   const total = validRows.reduce((sum, row) => sum + row.amountWei, 0n);
   return { validRows, total };
+}
+
+function parseDelimitedText(text) {
+  const rows = text
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split(line.includes(",") ? "," : /\t|;|\s{2,}/).map((cell) => cell.trim().replace(/^"|"$/g, "")));
+
+  if (!rows.length) return [];
+
+  const firstRow = rows[0].map((cell) => cell.toLowerCase());
+  const addressIndex = firstRow.findIndex((cell) => ["address", "wallet", "to", "地址", "收款地址", "钱包地址"].includes(cell));
+  const amountIndex = firstRow.findIndex((cell) => ["amount", "value", "数量", "金额", "转账金额"].includes(cell));
+  const hasHeader = addressIndex >= 0 && amountIndex >= 0;
+
+  return rows
+    .slice(hasHeader ? 1 : 0)
+    .map((row) => {
+      const address = row[hasHeader ? addressIndex : 0] || "";
+      const amount = row[hasHeader ? amountIndex : 1] || "";
+      return { address, amount };
+    })
+    .filter((row) => row.address && row.amount);
+}
+
+function fillRecipientsFromRows(rows) {
+  if (!rows.length) {
+    addLog("导入失败", "没有读取到地址和金额两列", "error");
+    return;
+  }
+
+  els.recipientInput.value = rows.map((row) => `${row.address},${row.amount}`).join("\n");
+  const validRows = validateRows();
+  const invalidCount = state.rows.length - validRows.length;
+  const nextStep =
+    invalidCount > 0
+      ? `有效 ${validRows.length} 条，无效 ${invalidCount} 条，请先检查红色错误行`
+      : `有效 ${validRows.length} 条，可以直接点“${state.sendMode === "contract" ? "批量转账" : "开始转账"}”`;
+  addLog("导入成功", nextStep, invalidCount > 0 ? "error" : "success");
+}
+
+async function importRecipientFile(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+    addLog("暂不直接读取 xlsx", "请在 Excel 里另存为 CSV，或复制地址和金额两列后粘贴到输入框", "error");
+    return;
+  }
+
+  const text = await file.text();
+  fillRecipientsFromRows(parseDelimitedText(text));
+}
+
+function downloadCsvTemplate() {
+  const csv = [
+    "收款地址,金额",
+    "0x1111111111111111111111111111111111111111,1.5",
+    "0x2222222222222222222222222222222222222222,2"
+  ].join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "batch-transfer-template.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function parseRows() {
@@ -728,6 +800,27 @@ els.nativeMode.addEventListener("click", () => setMode("native"));
 els.simpleSendMode.addEventListener("click", () => setSendMode("simple"));
 els.contractSendMode.addEventListener("click", () => setSendMode("contract"));
 els.recipientInput.addEventListener("input", validateRows);
+els.recipientInput.addEventListener("paste", (event) => {
+  const text = event.clipboardData?.getData("text/plain") || "";
+  if (!text.includes("\t")) return;
+  const rows = parseDelimitedText(text);
+  if (!rows.length) return;
+  event.preventDefault();
+  fillRecipientsFromRows(rows);
+});
+els.importBtn.addEventListener("click", () => els.fileInput.click());
+els.sampleCsvBtn.addEventListener("click", downloadCsvTemplate);
+els.fileInput.addEventListener("change", async () => {
+  const file = els.fileInput.files?.[0];
+  if (!file) return;
+  try {
+    await importRecipientFile(file);
+  } catch (error) {
+    addLog("导入失败", error.message || "文件读取失败", "error");
+  } finally {
+    els.fileInput.value = "";
+  }
+});
 
 if (location.protocol === "file:") {
   els.protocolNotice.hidden = false;

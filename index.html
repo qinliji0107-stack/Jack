@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MetaMask 批量转账工具</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">MetaMask Batch Sender</p>
+          <h1>批量转账代币</h1>
+        </div>
+        <button id="connectBtn" class="primary-btn" type="button">连接钱包</button>
+      </section>
+
+      <section id="protocolNotice" class="notice" hidden>
+        <div>
+          <strong>请用本地 HTTP 地址打开</strong>
+          <span>MetaMask 通常不会给 file:// 页面注入钱包对象，所以连接钱包会没有弹窗。</span>
+        </div>
+        <a href="http://127.0.0.1:5173/" class="notice-link">打开 http://127.0.0.1:5173/</a>
+      </section>
+
+      <section class="wallet-strip" aria-live="polite">
+        <div>
+          <span>钱包</span>
+          <strong id="walletAddress">未连接</strong>
+        </div>
+        <div>
+          <span>网络</span>
+          <strong id="networkName">未识别</strong>
+        </div>
+        <div>
+          <span>余额</span>
+          <strong id="walletBalance">-</strong>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <div class="panel transfer-panel">
+          <div class="panel-head">
+            <h2>转账设置</h2>
+            <div class="segmented" role="tablist" aria-label="转账类型">
+              <button id="erc20Mode" class="segment active" type="button">ERC-20</button>
+              <button id="nativeMode" class="segment" type="button">原生币</button>
+            </div>
+          </div>
+
+          <label class="field" id="tokenField">
+            <span>代币合约地址</span>
+            <input id="tokenAddress" autocomplete="off" spellcheck="false" placeholder="0x..." />
+          </label>
+
+          <div class="mode-card">
+            <div>
+              <strong>发送方式</strong>
+              <span id="sendModeHint">普通模式：不用部署合约，但每笔都要在小狐狸确认一次。</span>
+            </div>
+            <div class="segmented compact" role="tablist" aria-label="发送方式">
+              <button id="simpleSendMode" class="segment active" type="button">普通</button>
+              <button id="contractSendMode" class="segment" type="button">一次确认</button>
+            </div>
+          </div>
+
+          <div id="contractSettings" class="advanced-box" hidden>
+            <label class="field">
+              <span>批量转账合约地址</span>
+              <input id="batchAddress" autocomplete="off" spellcheck="false" placeholder="已部署的 BatchTransfer 合约地址 0x..." />
+            </label>
+            <p>这个模式需要先部署批量合约。ERC-20 首次通常是授权一次加批量转账一次；授权额度够时只确认一次。</p>
+          </div>
+
+          <div class="token-grid">
+            <label class="field">
+              <span>代币符号</span>
+              <input id="tokenSymbol" readonly value="-" />
+            </label>
+            <label class="field">
+              <span>小数位</span>
+              <input id="tokenDecimals" readonly value="-" />
+            </label>
+            <label class="field">
+              <span>可用余额</span>
+              <input id="tokenBalance" readonly value="-" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>收款地址和金额</span>
+            <textarea id="recipientInput" spellcheck="false" placeholder="每行一条：地址,金额&#10;0x1111111111111111111111111111111111111111,1.5&#10;0x2222222222222222222222222222222222222222,2"></textarea>
+          </label>
+
+          <div class="summary-grid">
+            <div>
+              <span>有效条数</span>
+              <strong id="validCount">0</strong>
+            </div>
+            <div>
+              <span>总金额</span>
+              <strong id="totalAmount">0</strong>
+            </div>
+            <div>
+              <span>预计交易</span>
+              <strong id="txCount">0</strong>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="loadTokenBtn" class="ghost-btn" type="button">读取代币</button>
+            <button id="validateBtn" class="ghost-btn" type="button">校验列表</button>
+            <button id="approveBtn" class="ghost-btn" type="button">授权额度</button>
+            <button id="sendBtn" class="primary-btn" type="button">开始转账</button>
+            <button id="stopBtn" class="danger-btn" type="button" disabled>停止</button>
+          </div>
+        </div>
+
+        <aside class="panel status-panel">
+          <div class="panel-head">
+            <h2>执行状态</h2>
+            <button id="exportBtn" class="ghost-btn small" type="button">导出结果</button>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-meta">
+              <span id="progressText">等待开始</span>
+              <span id="progressNumbers">0 / 0</span>
+            </div>
+            <div class="progress-bar" aria-hidden="true">
+              <div id="progressFill"></div>
+            </div>
+          </div>
+          <div id="logList" class="log-list" aria-live="polite"></div>
+        </aside>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="panel-head">
+          <h2>收款清单</h2>
+          <span id="parseHint">支持逗号、空格或制表符分隔</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>地址</th>
+                <th>金额</th>
+                <th>状态</th>
+                <th>交易哈希</th>
+              </tr>
+            </thead>
+            <tbody id="recipientTable">
+              <tr>
+                <td colspan="5" class="empty">粘贴收款清单后点击校验</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
